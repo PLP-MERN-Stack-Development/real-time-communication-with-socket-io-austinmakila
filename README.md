@@ -37,41 +37,100 @@ socketio-chat/
 ```
 
 ## Getting Started
+Repo: https://github.com/PLP-MERN-Stack-Development/real-time-communication-with-socket-io-austinmakila.git
 
-1. Accept the GitHub Classroom assignment invitation
-2. Clone your personal repository that was created by GitHub Classroom
-3. Follow the setup instructions in the `Week5-Assignment.md` file
-4. Complete the tasks outlined in the assignment
 
-## Files Included
+## Initializing node env in server side..
+mkdir server && cd server
+npm init -y
+npm i express socket.io cors multer mongoose jsonwebtoken bcrypt dotenv
+# dev: nodemon
+npm i -D nodemon
 
-- `Week5-Assignment.md`: Detailed assignment instructions
-- Starter code for both client and server:
-  - Basic project structure
-  - Socket.io configuration templates
-  - Sample components for the chat interface
+# Summary of changes
 
-## Requirements
+## Server
 
-- Node.js (v18 or higher)
-- npm or yarn
-- Modern web browser
-- Basic understanding of React and Express
+server/server.js — replaced/updated to a production-friendly Socket.IO + Express setup with:
 
-## Submission
+## JWT-friendly handshake (simple username support),
 
-Your work will be automatically submitted when you push to your GitHub Classroom repository. Make sure to:
+presence tracking with MongoDB User model,
 
-1. Complete both the client and server portions of the application
-2. Implement the core chat functionality
-3. Add at least 3 advanced features
-4. Document your setup process and features in the README.md
-5. Include screenshots or GIFs of your working application
-6. Optional: Deploy your application and add the URLs to your README.md
+Message model and persistent message saves (MongoDB + Mongoose),
 
-## Resources
+## file upload endpoint (/upload) using multer,
 
-- [Socket.io Documentation](https://socket.io/docs/v4/)
-- [React Documentation](https://react.dev/)
-- [Express.js Documentation](https://expressjs.com/)
-- [Building a Chat Application with Socket.io](https://socket.io/get-started/chat) 
+events: sendMessage, privateMessage, typing, reaction, markRead, joinRoom, leaveRoom,
+
+message pagination REST endpoint: GET /messages?room=...&page=...&limit=....
+
+## server Models
+
+server/models/Message.js — schema for messages (reactions + readBy).
+
+server/models/User.js — schema for users with online, socketId, lastSeen.
+
+## Client
+
+client/src/hooks/useSocket.js — reusable hook handling connection, reconnection, event listeners, typing states and helper functions for emitting events.
+
+client/src/App.jsx — updated UI wiring to use useSocket with simple login flow, message list, typing indicator, file upload, basic read receipts/reactions.
+
+
+
+
+# Client side ...
+
+## Using Vite
+npm create vite@latest chat-client -- --template react
+cd chat-client
+npm install socket.io-client axios
+
+
+
+## Important features explained & how they map to code
+
+Live messaging to everyone: io.emit() from server or nsp.to(room).emit('message', ...) sends to a room.
+
+Broadcast except sender: socket.broadcast.emit() or socket.to(room).emit(...).
+
+Typing indicator: client emits typing and server forwards to everyone else in room (socket.to(room).emit('typing', {user, typing})).
+
+Online status: keep User collection + presence events emitted to clients on connect/disconnect.
+
+Private messages: privateMessage event saved to DB and sent to recipient socket using map of online users.
+
+Rooms/channels: joinRoom / leaveRoom events; server uses socket.join(room).
+
+File/image sharing: file upload endpoint returns URL; client sends message with type: 'image' and content = URL.
+
+Read receipts & reactions: separate socket events markRead and reaction, update DB and broadcast updates.
+
+Message pagination: REST endpoint /messages?room=global&page=1&limit=20 returning paged messages.
+
+Acks: callbacks on socket.emit(..., ackFn) used to confirm message saved/delivered.
+
+Reconnection: socket.io-client options reconnectionAttempts, reconnectionDelay. Handle queued outgoing messages while offline on client.
+
+Namespaces: shown with io.of('/staff') if you want isolated channels for admin/staff.
+
+Scaling: for multiple Node instances, enable socket.io-redis adapter (or Redis adapter) so that sockets across instances can communicate. Also disable sticky sessions unless using adapter.
+
+Security & production notes
+
+Use HTTPS (TLS) in production.
+
+Use JWT for auth and validate token on connection (handshake.auth.token).
+
+Sanitize message content to prevent XSS; escape when rendering or use safe text nodes.
+
+Limit file upload sizes and validate file types. Store files in S3 for scale.
+
+Use Redis adapter for Socket.IO across multiple server instances: const { createAdapter } = require('@socket.io/redis-adapter').
+
+Rate-limit message sends to prevent abuse.
+
+Use content moderation if needed (e.g., for file/image scanning).
+
+
